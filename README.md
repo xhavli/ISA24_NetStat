@@ -15,6 +15,7 @@ Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line
 - Compiler g++
 - Library libpcap
 - Library ncurses
+- License GPL-3.0
 
 ## Program execution
 
@@ -35,6 +36,7 @@ Example of run command:
 | Interface         | `-i`     |                | `string`        | Specify network interface where to sniff 
 | Sorting option    | `-s`     | `b`            | `b / p`         | Specify sorting option by bytes or packets
 | Refresh rate      | `-t`     | `1`            | `seconds`       | Set refresh rate of statistics
+| Helper            | `-h`     |                | `h`             | Print help message and exit sucessfully
 
 If will be provided argument -i without its value, list of all avalilable interfaces will be shown
 
@@ -52,6 +54,12 @@ Output is in following format using ncurses library where:
 ![OutputExample](docs/OutputExample.png)
 
 ## Implementation detail
+
+Program will handle `Ctrl+C` interrupt for smooth exit
+
+Return codes:
+- 0 if success
+- 1 if any error
 
 ### Program flow
 
@@ -71,7 +79,8 @@ Ethernet - Ethernet header...
 
 ## Known problems
 - Application not correctly free all used memory at exit
-- If only `-i` argument will be provided to see available devices, error message will be shown  
+- If only `-i` argument will be provided to see available devices, error message will be shown
+- If is set long refresh rate and program recognize `Ctrl+C` interrupt, it will wait for long time to quit
 
 ## Notes
 - Developed with suport of ChatGPT and GithubCopilot
