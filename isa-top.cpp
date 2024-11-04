@@ -1,52 +1,135 @@
-// Comp: g++ isa-top.cpp -o isa-top -lpcap
-// Run: ./isa-top -eno1 0 -s b
 #include <iostream>
-#include <unistd.h> // For getopt() and sleep()
+#include <unistd.h> // for getopt() and sleep()
 #include <string>
 #include <cstring>
-#include <cstdlib>  // For exit()
-#include <stdexcept>    // For exception handling
-#include <vector>       // For std::vector
-#include <map>          // For std::map
-#include <pcap.h>   //Fedora sudo dnf install libpcap-devel
-#include <csignal>  // For signal handling
+#include <optional>
+#include <cstdlib>  // for exit()
+#include <stdexcept>// for exception handling
+#include <csignal>  // for signal handling
+#include <vector>
+#include <map>
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <unordered_map>
+#include <netinet/ip.h>     // for IPv4 header
+#include <netinet/ip6.h>    // for IPv6 headers
+#include <netinet/tcp.h>    // for TCP header
+#include <netinet/udp.h>    // for UDP header
+#include <netinet/ip_icmp.h>// for ICMP header
+#include <arpa/inet.h>      // for inet_ntoa
+#include <pcap.h>   // fedora sudo dnf install libpcap-devel
 
 struct Config {
-    std::string interfaceName = "";
-    std::string sortOption = "bytes";   // Default value
-    int refreshTime = 1;    // Default value
+    std::string interfaceName;
+    std::string sortOption;
+    std::optional<unsigned int> refreshTime;   // in seconds
 };
-
 Config config;
+
 char errBuff[PCAP_ERRBUF_SIZE];
 pcap_if_t *alldevs;
-pcap_if_t *device;
+pcap_t *opennedDevice;
 std::map<std::string, pcap_if_t*> devicesDictionary;
-
-struct PacketData {
-    const u_char* data;
-    struct pcap_pkthdr header;
-};
-
-std::vector<PacketData> packets;
-std::mutex packetsMutex;
 bool capturing = true;
 
+struct PacketData {
+    std::string srcIP;
+    std::string dstIP;
+    uint16_t srcPort;
+    uint16_t dstPort;
+    std::string protocol;
+    uint32_t bytesRx;
+    uint32_t packetsRx;
+    uint32_t bytesTx;
+    uint32_t packetsTx;
+    uint32_t bytesTotal;
+    uint32_t packetsTotal;
+};
+std::unordered_map<std::string, PacketData> connectionMap;
+
+
+
 /**
- * @brief Handle signal
- * @param[in] signal
+ * @brief Print all connections information
  * @return void
- * @note This function is called when a signal is caught
- * @note It sets the capturing flag to false
+ * @note This function is called periodically to print all connections information
+ * @note It prints the connection information and clears the connectionMap
+ * @note It sleeps for a specified time interval
+ * @note It stops when the capturing flag is set to false
+ * @note It is called in a separate thread
  */
-void handle_signal(int signal) {
-    capturing = false;
+void print_all_connections_info(){
+    while(capturing){
+        std::this_thread::sleep_for(std::chrono::seconds(*config.refreshTime));
+        if(!capturing){break;}
+        
+        std::cout << "===== " << connectionMap.size() << " connections captured in the last " << *config.refreshTime << " seconds =====" << std::endl;
+        if (connectionMap.empty()) {
+            std::cout << "No connections captured in the last second." << std::endl;
+        } else {
+            for (const auto& [key, connectionData] : connectionMap) {
+                std::cout << "Src IP:port " + connectionData.srcIP + ":" + std::to_string(connectionData.srcPort) << std::endl;
+                std::cout << "Dst IP:port " + connectionData.dstIP + ":" + std::to_string(connectionData.dstPort) << std::endl;
+                std::cout << "Proto " << connectionData.protocol << std::endl;
+                std::cout << "Bytes Tx: " << connectionData.bytesTx << std::endl;
+                std::cout << "Pckts Tx: " << connectionData.packetsTx << std::endl;
+                std::cout << "Bytes Rx: " << connectionData.bytesRx << std::endl;
+                std::cout << "Pckts Rx: " << connectionData.packetsRx << std::endl;
+                std::cout << "Bytes total: " << connectionData.bytesTotal << std::endl;
+                std::cout << "Pckts total: " << connectionData.packetsTotal << std::endl;
+                std::cout << "--------------------------------------" << std::endl;
+            }
+            connectionMap.clear();  // Clear after printing
+        }
+        std::cout << "==============================================" << std::endl;
+    }
 }
 
-// Callback function to capture packets
+/**
+ * @brief Insert or update connection information
+ * @param[in] packetData
+ * @return void
+ * @note This function is called every time a packet is captured
+ * @note It inserts a new connection if the connection does not exist
+ * @note It updates the connection information if the connection already exists
+ */
+void insert_or_update_connection_info(PacketData packetData) {
+    //std::lock_guard<std::mutex> lock(connectionMutex);    //TODO do we need mutex?
+    // Define both key variations for the connection (source-to-destination and destination-to-source)
+    std::string defaultConnectionKey = packetData.srcIP + std::to_string(packetData.srcPort) + 
+                                       packetData.dstIP + std::to_string(packetData.dstPort) + packetData.protocol;
+    std::string reverseConnectionKey = packetData.dstIP + std::to_string(packetData.dstPort) +
+                                       packetData.srcIP + std::to_string(packetData.srcPort) + packetData.protocol;
+    
+    // Check if the connection exists by the default key
+    if (connectionMap.find(defaultConnectionKey) != connectionMap.end()) {
+        // If found by default connection key, update Tx (assuming bytesCount and packetCount are Tx)
+        connectionMap[defaultConnectionKey].bytesTx += packetData.bytesTotal;
+        connectionMap[defaultConnectionKey].packetsTx += packetData.packetsTotal;
+        connectionMap[defaultConnectionKey].bytesTotal += packetData.bytesTotal;
+        connectionMap[defaultConnectionKey].packetsTotal += packetData.packetsTotal;
+    }
+    // Check if the connection exists by the reverse key
+    else if (connectionMap.find(reverseConnectionKey) != connectionMap.end()) {
+        // If found by reverse connection key, update Rx (assuming bytesCount and packetCount are Rx)
+        std::swap(packetData.srcIP, packetData.dstIP);
+        std::swap(packetData.srcPort, packetData.dstPort);
+        connectionMap[reverseConnectionKey].bytesRx += packetData.bytesTotal;
+        connectionMap[reverseConnectionKey].packetsRx += packetData.packetsTotal;
+        connectionMap[reverseConnectionKey].bytesTotal += packetData.bytesTotal;
+        connectionMap[reverseConnectionKey].packetsTotal += packetData.packetsTotal;
+    }
+    // Insert a new entry if neither key is found
+    else {
+        packetData.bytesTx = packetData.bytesTotal;
+        packetData.packetsTx = packetData.packetsTotal;
+        packetData.bytesRx = 0;
+        packetData.packetsRx = 0;
+        connectionMap[defaultConnectionKey] = packetData;
+    }
+}
+
 /**
  * @brief Callback function to capture packets
  * @param[in] userData
@@ -54,50 +137,89 @@ void handle_signal(int signal) {
  * @param[in] packet
  * @return void
  * @note This function is called every time a packet is captured
- * @note It stores the packet data and header into the packets vector
- * @note It uses a mutex to protect the packets vector
- * @note It is called from pcap_loop() function
+ * @note It processes the packet and stores the connection information
+ * @note It calls insert_or_update_connection_info() to store the connection information
+ * @note It ignores packets with protocols other than TCP, UDP, ICMP, and ICMPv6
+ * @note It ignores packets with EtherTypes other than IPv4 and IPv6
  */
 void packet_handler(u_char* userData, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
-    std::lock_guard<std::mutex> lock(packetsMutex); // Unlock the mutex when the function returns (out of scope)
-    PacketData p;
-    p.data = packet;
-    p.header = *pkthdr;
-    packets.push_back(p);
-}
+    PacketData packetData;
+    packetData.bytesTotal = pkthdr->len;
+    packetData.packetsTotal = 1;
 
-// Function to print packet information periodically (e.g., every second)
-int printPacketsPeriodically() {
-    while (capturing) {
-        std::this_thread::sleep_for(std::chrono::seconds(config.refreshTime));
+    // Determine if the packet is IPv4 or IPv6 based on the EtherType field
+    uint16_t ethertype = ntohs(*(uint16_t*)(packet + 12)); // EtherType is at bytes 12-13
 
-        std::lock_guard<std::mutex> lock(packetsMutex); // Unlock the mutex when the function returns (out of scope)
-        std::cout << "===== " << packets.size() << " captured in the last second =====" << std::endl;
-        if (!packets.empty()) {
-            for (const auto& packet : packets) {
-                std::cout << "Packet captured at: " << packet.header.ts.tv_sec << " seconds" << std::endl;
-                std::cout << "Packet length: " << packet.header.len << " bytes" << std::endl;
-                // std::cout << "Packet data: ";
-                // for (unsigned int i = 0; i < packet.header.len; i++) {
-                //     std::printf("%02x ", packet.data[i]);
-                //     if ((i + 1) % 16 == 0) std::cout << std::endl;
-                // }
-                // std::cout << std::endl;
+    if (ethertype == 0x0800) {  // IPv4 EtherType
+        struct ip *ipHeader = (struct ip *)(packet + 14);
+        packetData.srcIP = inet_ntoa(ipHeader->ip_src);
+        packetData.dstIP = inet_ntoa(ipHeader->ip_dst);
+        
+        switch (ipHeader->ip_p) {
+            case IPPROTO_TCP: {
+                struct tcphdr *tcpHeader = (struct tcphdr *)(packet + 14 + ipHeader->ip_hl * 4);
+                packetData.protocol = "tcp";
+                packetData.srcPort = ntohs(tcpHeader->th_sport);
+                packetData.dstPort = ntohs(tcpHeader->th_dport);
+                break;
             }
-            packets.clear();  // Clear after printing
-        } else {
-            std::cout << "No packets captured in the last second." << std::endl;
+            case IPPROTO_UDP: {
+                struct udphdr *udpHeader = (struct udphdr *)(packet + 14 + ipHeader->ip_hl * 4);
+                packetData.protocol = "udp";
+                packetData.srcPort = ntohs(udpHeader->uh_sport);
+                packetData.dstPort = ntohs(udpHeader->uh_dport);
+                break;
+            }
+            case IPPROTO_ICMP:
+                packetData.protocol = "icmp";
+                break;
+            default:
+                return; // Ignore other protocols based on IPv4
         }
-        std::cout << "==============================================" << std::endl;
+    } else if (ethertype == 0x86DD) {  // IPv6 EtherType
+        struct ip6_hdr *ip6Header = (struct ip6_hdr *)(packet + 14);
+        char srcIP[INET6_ADDRSTRLEN];
+        char dstIP[INET6_ADDRSTRLEN];
+        
+        inet_ntop(AF_INET6, &(ip6Header->ip6_src), srcIP, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET6, &(ip6Header->ip6_dst), dstIP, INET6_ADDRSTRLEN);
+        
+        packetData.srcIP = srcIP;
+        packetData.dstIP = dstIP;
+
+        switch (ip6Header->ip6_nxt) {
+            case IPPROTO_TCP: {
+                struct tcphdr *tcpHeader = (struct tcphdr *)(packet + 14 + sizeof(struct ip6_hdr));
+                packetData.protocol = "tcp";
+                packetData.srcPort = ntohs(tcpHeader->th_sport);
+                packetData.dstPort = ntohs(tcpHeader->th_dport);
+                break;
+            }
+            case IPPROTO_UDP: {
+                struct udphdr *udpHeader = (struct udphdr *)(packet + 14 + sizeof(struct ip6_hdr));
+                packetData.protocol = "udp";
+                packetData.srcPort = ntohs(udpHeader->uh_sport);
+                packetData.dstPort = ntohs(udpHeader->uh_dport);
+                break;
+            }
+            case IPPROTO_ICMPV6:
+                packetData.protocol = "icmpv6";
+                break;
+            default:
+                return; // Ignore other protocols based on IPv6
+        }
+    } else {
+        return; // Ignore other packets for example ARP or other protocols
     }
-    exit(EXIT_SUCCESS);
+
+    insert_or_update_connection_info(packetData);    
 }
 
 /**
  * @brief Store all available devices in the deviceMap vector
  */
 void process_all_devices(){
-    for (device = alldevs; device != nullptr; device = device->next) {
+    for (pcap_if_t *device = alldevs; device != nullptr; device = device->next) {
         devicesDictionary[device->name] = device;
     }
 
@@ -128,12 +250,12 @@ void print_all_interfaces(){
     std::cout << "Available interfaces:" << std::endl;
     int i = 0;
     for (const auto& [name, device] : devicesDictionary) {
-    std::cout << i + 1 << ". " << device->name;
-    if (device->description) {
-        std::cout << " (" + std::string(device->description) + ")";
-    }
-    std::cout << std::endl;
-    i++;
+        std::cout << i + 1 << ". " << device->name;
+        if (device->description) {
+            std::cout << " (" + std::string(device->description) + ")";
+        }
+        std::cout << std::endl;
+        i++;
     }
 
     pcap_freealldevs(alldevs);
@@ -171,8 +293,8 @@ void parse_arguments(int argc, char **argv) {
                 } else if (strcmp(optarg, "p") == 0) {
                     config.sortOption = "packets";
                 } else {
-                    std::cerr << "Error: Invalid value for -s option. Use 'b' for bytes or 'p' for packets\n";
-                    exit(EXIT_FAILURE);
+                    std::cerr << "Error: Invalid value for -s option. Use 'b' for bytes or 'p' for packets. Set bytes as default\n";
+                    config.sortOption = "bytes"; // Default value
                 }
                 break;
 
@@ -181,14 +303,14 @@ void parse_arguments(int argc, char **argv) {
                     std::size_t pos;
                     config.refreshTime = std::stoi(optarg, &pos);
                     if (pos != std::strlen(optarg)) {
-                        std::cerr << "Error: Invalid interface number. Input contains non-integer characters. Set 0 as default\n";
+                        std::cerr << "Error: Invalid interface number. Input contains non-integer characters. Set 1 second as default\n";
                         config.refreshTime = 1; // Default value
                     }
                 } catch (const std::invalid_argument& e) {
-                    std::cerr << "Error: Invalid interface number (non-integer value). Set 0 as default\n";
+                    std::cerr << "Error: Invalid interface number (non-integer value). Set 1 second as default\n";
                     config.refreshTime = 1; // Default value
                 } catch (const std::out_of_range& e) {
-                    std::cerr << "Error: Interface number out of range. Set 0 as default\n";
+                    std::cerr << "Error: Interface number out of range. Set 1 second as default\n";
                     config.refreshTime = 1; // Default value
                 }
                 break;
@@ -217,14 +339,30 @@ void parse_arguments(int argc, char **argv) {
         print_help();
         exit(EXIT_FAILURE);
     }
+
+    if (!config.refreshTime.has_value()) {
+        std::cerr << "Error: Refresh rate was not provided. Set 1 second as default\n";
+        config.refreshTime = 1; // Default value
+    }
 }
 
-
+/**
+ * @brief Handle signal
+ * @param[in] signal
+ * @return void
+ * @note This function is called when a signal is caught
+ * @note It breaks the pcap_loop() function
+ * @note It sets the capturing flag to false
+ */
+void signal_handler(int signal) {
+    pcap_breakloop(opennedDevice);  // Break the pcap_loop() function
+    capturing = false;
+}
 
 int main(int argc, char* argv[]) {
 
-    std::signal(SIGINT, handle_signal);     // Ctrl+C
-    std::signal(SIGTERM, handle_signal);    // Termination signal
+    std::signal(SIGINT, signal_handler);    // Ctrl+C
+    std::signal(SIGTERM, signal_handler);   // Termination signal
 
     parse_arguments(argc, argv);
     find_all_devices();
@@ -237,28 +375,34 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    //TODO remove debug print
+    std::cout << "--------------------------------------" << std::endl;
     std::cout << "Selected interface: " << device->name << std::endl;
     std::cout << "Description: " << (device->description ? device->description : "N/A") << std::endl;
     std::cout << "Sorting by: " << config.sortOption << std::endl;
+    std::cout << "--------------------------------------" << std::endl;
+
 
     // Open the device for packet capture
-    pcap_t* opennedDevice = pcap_open_live(device->name, BUFSIZ, 1, 1000, errBuff);
+    opennedDevice = pcap_open_live(device->name, BUFSIZ, 1, 1000, errBuff);
     if (opennedDevice == nullptr) {
         std::cerr << "Could not open device: " << errBuff << std::endl;
         pcap_freealldevs(alldevs);
         exit(EXIT_FAILURE);
     }
 
-    // Start a thread to print packets every second
-    std::thread printerThread(printPacketsPeriodically);
+    // Start the thread to periodically print and clear connection info
+    std::thread printerThread(print_all_connections_info);
 
-    // Capture packets continuously (until the user stops the program)
-    pcap_loop(opennedDevice, 0, packet_handler, nullptr);  // 0 means infinite packet capture
+    // Capture packets continuously - 0 means infinite packet capture
+    pcap_loop(opennedDevice, 0, packet_handler, nullptr);
 
-    // When done, close the device and free resources
-    capturing = false;  // Stop the printer thread
-    printerThread.join();  // Wait for the printer thread to finish
+    // Ensure that printerThread exits properly after capturing is stopped
+    if (printerThread.joinable()) {
+        printerThread.join();   // Wait for the printer thread to finish
+    }
 
+    //TODO do better cleanup
     pcap_close(opennedDevice);
     pcap_freealldevs(alldevs);
 
