@@ -2,7 +2,7 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = -g	#-Wall -Wextra -Werror	#TODO
+CXXFLAGS = -g	#-Wall -Wextra -Werror	#TODO 
 
 # Linker flags for pcap
 LDFLAGS = -lpcap -lncurses
