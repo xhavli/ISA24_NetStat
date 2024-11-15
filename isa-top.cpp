@@ -4,13 +4,17 @@
 #include <cstring>
 #include <optional> // for optional argument values
 #include <cstdlib>  // for exit()
-#include <stdexcept>// for exception handling
+#include <stdexcept>    // for exception handling
 #include <csignal>  // for signal handling
+#include <algorithm>    // for std::sort
+#include <iomanip>  // for std::setprecision
+#include <sstream>
 #include <vector>
 #include <map>
 #include <thread>
-#include <chrono>
+#include <chrono>      // for std::chrono::seconds
 #include <mutex>
+#include <condition_variable>
 #include <unordered_map>
 #include <netinet/ip.h>     // for IPv4 header
 #include <netinet/ip6.h>    // for IPv6 headers
@@ -19,6 +23,7 @@
 #include <netinet/ip_icmp.h>// for ICMP header
 #include <arpa/inet.h>      // for inet_ntoa
 #include <pcap.h>   // fedora sudo dnf install libpcap-devel
+#include <ncurses.h>    // fedora sudo dnf install ncurses-devel
 
 struct Config {
     std::string interfaceName;
@@ -33,6 +38,7 @@ pcap_if_t *alldevs = nullptr;
 pcap_t *opennedDevice = nullptr;
 std::map<std::string, pcap_if_t*> devicesDictionary;
 bool capturing = true;
+bool printing = false; 
 
 struct PacketData {
     std::string srcIP;
@@ -52,39 +58,136 @@ std::unordered_map<std::string, PacketData> connectionMap;
 
 
 /**
- * @brief Print all connections information
- * @return void
- * @note This function is called periodically to print all connections information
- * @note It prints the connection information and clears the connectionMap
- * @note It sleeps for a specified time interval
- * @note It stops when the capturing flag is set to false
- * @note It is called in a separate thread
+ * @brief Format the load value to the appropriate unit
+ * @param[in] load
+ * @return formatted load value
+ * @note This function is called by print_all_connections_info() to format the load value
  */
-void print_all_connections_info(){
-    while(capturing){
+std::string format_load(uint32_t load) {
+    const char* suffixes[] = { "", "k", "M", "G", "T" };
+    double rate = static_cast<double>(load) / config.refreshTime.value();
+    int i = 0;
+
+    // Divide by 1000 to get the appropriate unit, up to Terabytes
+    //TODO mention in documentation - this is a simple way to get the right unit, but it's not the most accurate
+    //TODO mention in documentation - siffix kilo have k for packets also, not as it was shown in example
+    while (rate >= 1000 && i < 4) {
+        rate /= 1000;
+        ++i;
+    }
+
+    // Round to 1 decimal place
+    std::ostringstream out;
+    // If the value is an integer, print it without the decimal part
+    if (rate == static_cast<int>(rate)) {
+        out << static_cast<int>(rate);
+    } else {
+        out << std::fixed << std::setprecision(1) << rate;  // Print with 1 decimal
+    }
+    out << suffixes[i];
+    return out.str();
+}
+
+/**
+ * @brief Sort connections based on the sortOption
+ * @param[in] connectionMap
+ * @return sorted connections vector
+ * @note This function is called by print_all_connections_info() to sort the connections
+ */
+std::vector<std::pair<std::string, PacketData>> sort_connections(const std::unordered_map<std::string, PacketData>& connectionMap) 
+{
+    std::vector<std::pair<std::string, PacketData>> connectionsVector(connectionMap.begin(), connectionMap.end());
+
+    if (config.sortOption == "packets") {
+        std::sort(connectionsVector.begin(), connectionsVector.end(),
+            [](const auto& a, const auto& b) {
+                return a.second.packetsTotal > b.second.packetsTotal;
+            });
+    } else {    // Default sorting by bytes
+        std::sort(connectionsVector.begin(), connectionsVector.end(),
+            [](const auto& a, const auto& b) {
+                return a.second.bytesTotal > b.second.bytesTotal;
+            });
+    }
+
+    return connectionsVector;
+}
+
+/**
+ * @brief Print all connections information every refreshTime seconds
+ * @return void
+ * @note This function is locking connectionMapMutex to access the connectionMap
+ * @note It uses ncurses to print the information in a table format
+ * @note It clears the screen and prints the connection information
+ * @note It sorts the connections based on the sortOption
+ */
+void print_all_connections_info() {
+    // Initialize ncurses
+    initscr();
+    noecho();
+    cbreak();
+    curs_set(0);  // Hide the cursor
+    int row, col;
+    getmaxyx(stdscr, row, col);  // Get screen size
+
+    while (capturing) {
         std::this_thread::sleep_for(std::chrono::seconds(*config.refreshTime));
-        if(!capturing){break;}
-        
-        std::cout << "===== " << connectionMap.size() << " connections captured in the last " << *config.refreshTime << " seconds =====" << std::endl;
+
+        if (!capturing) { break; }  // Exit if capturing is false
+
+        std::unique_lock<std::mutex> lock(connectionMapMutex);
+        printing = true;
+
+        clear();  // Clear the ncurses window
+
         if (connectionMap.empty()) {
-            std::cout << "No connections captured in the last second." << std::endl;
+            mvprintw(1, 0, "No connections captured in the last %d seconds", *config.refreshTime);
         } else {
-            for (const auto& [key, connectionData] : connectionMap) {
-                std::cout << "Src IP:port " + connectionData.srcIP + ":" + std::to_string(connectionData.srcPort) << std::endl;
-                std::cout << "Dst IP:port " + connectionData.dstIP + ":" + std::to_string(connectionData.dstPort) << std::endl;
-                std::cout << "Proto " << connectionData.protocol << std::endl;
-                std::cout << "Bytes Tx: " << connectionData.bytesTx << std::endl;
-                std::cout << "Pckts Tx: " << connectionData.packetsTx << std::endl;
-                std::cout << "Bytes Rx: " << connectionData.bytesRx << std::endl;
-                std::cout << "Pckts Rx: " << connectionData.packetsRx << std::endl;
-                std::cout << "Bytes total: " << connectionData.bytesTotal << std::endl;
-                std::cout << "Pckts total: " << connectionData.packetsTotal << std::endl;
-                std::cout << "--------------------------------------" << std::endl;
+            mvprintw(1, 0, "================================================= %lu connections captured in the last %d seconds =================================================", connectionMap.size(), *config.refreshTime);
+            // Print the static header
+            // // Positions   "0   [ipv6]:port max length is 48                    53  56                                                  108         120 124127      136 140143"
+            // mvprintw(2, 0, "Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx");
+            // mvprintw(3, 0, "                                                                                                                        b/s    p/s      b/s    p/s");
+            mvprintw(2, 0, "Src IP:port");
+            mvprintw(2, 52, "<->");
+            mvprintw(2, 56, "Dst IP:port");
+            mvprintw(2, 108, "Protocol");
+            mvprintw(2, 124, "Rx");
+            mvprintw(2, 140, "Tx");
+            mvprintw(3, 120, "b/s");
+            mvprintw(3, 127, "p/s");
+            mvprintw(3, 136, "b/s");
+            mvprintw(3, 143, "p/s");
+
+            std::vector<std::pair<std::string, PacketData>> sortedConnections = sort_connections(connectionMap);
+            int line = 4;  // Start printing from the 5th row
+
+            for (int i = 0; i < config.showRecords && i < sortedConnections.size(); ++i) {
+                const auto& [key, connectionData] = sortedConnections[i];
+                mvprintw(line, 0, connectionData.srcIP.c_str());
+                mvprintw(line, 52, "<->");
+                mvprintw(line, 56, connectionData.dstIP.c_str());
+
+                mvprintw(line, 108, connectionData.protocol.c_str());
+
+                mvprintw(line, 120, format_load(connectionData.bytesRx).c_str());
+                mvprintw(line, 127, format_load(connectionData.packetsRx).c_str());
+
+                mvprintw(line, 136, format_load(connectionData.bytesTx).c_str());
+                mvprintw(line, 143, format_load(connectionData.packetsTx).c_str());
+
+                line++;
             }
             connectionMap.clear();  // Clear after printing
         }
-        std::cout << "==============================================" << std::endl;
+
+        refresh();  // Refresh the screen to display changes
+        printing = false;
+        connectionMapConditionVariable.notify_all();
     }
+
+    // End ncurses
+    endwin();
 }
 
 /**
@@ -96,12 +199,13 @@ void print_all_connections_info(){
  * @note It updates the connection information if the connection already exists
  */
 void insert_or_update_connection_info(PacketData packetData) {
-    //std::lock_guard<std::mutex> lock(connectionMutex);    //TODO do we need mutex?
     // Define both key variations for the connection (source-to-destination and destination-to-source)
     std::string defaultConnectionKey = packetData.srcIP + std::to_string(packetData.srcPort) + 
                                        packetData.dstIP + std::to_string(packetData.dstPort) + packetData.protocol;
     std::string reverseConnectionKey = packetData.dstIP + std::to_string(packetData.dstPort) +
                                        packetData.srcIP + std::to_string(packetData.srcPort) + packetData.protocol;
+
+    std::unique_lock<std::mutex> lock(connectionMapMutex);
     
     // Check if the connection exists by the default key
     if (connectionMap.find(defaultConnectionKey) != connectionMap.end()) {
@@ -187,8 +291,8 @@ void packet_handler(u_char* userData, const struct pcap_pkthdr* pkthdr, const u_
         inet_ntop(AF_INET6, &(ip6Header->ip6_src), srcIP, INET6_ADDRSTRLEN);
         inet_ntop(AF_INET6, &(ip6Header->ip6_dst), dstIP, INET6_ADDRSTRLEN);
         
-        packetData.srcIP = srcIP;
-        packetData.dstIP = dstIP;
+        packetData.srcIP = "[" + std::string(srcIP) + "]";
+        packetData.dstIP = "[" + std::string(dstIP) + "]";
 
         switch (ip6Header->ip6_nxt) {
             case IPPROTO_TCP: {
