@@ -5,7 +5,7 @@ CXX = g++
 CXXFLAGS = -g	#-Wall -Wextra -Werror	#TODO
 
 # Linker flags for pcap
-LDFLAGS = -lpcap
+LDFLAGS = -lpcap -lncurses
 
 # Target executable
 TARGET = isa-top
