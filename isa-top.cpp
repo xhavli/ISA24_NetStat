@@ -2,7 +2,7 @@
 #include <unistd.h> // for getopt() and sleep()
 #include <string>
 #include <cstring>
-#include <optional>
+#include <optional> // for optional argument values
 #include <cstdlib>  // for exit()
 #include <stdexcept>// for exception handling
 #include <csignal>  // for signal handling
@@ -24,12 +24,13 @@ struct Config {
     std::string interfaceName;
     std::string sortOption;
     std::optional<unsigned int> refreshTime;   // in seconds
+    std::optional<unsigned int> showRecords;
 };
 Config config;
 
 char errBuff[PCAP_ERRBUF_SIZE];
-pcap_if_t *alldevs;
-pcap_t *opennedDevice;
+pcap_if_t *alldevs = nullptr;
+pcap_t *opennedDevice = nullptr;
 std::map<std::string, pcap_if_t*> devicesDictionary;
 bool capturing = true;
 
@@ -146,6 +147,8 @@ void packet_handler(u_char* userData, const struct pcap_pkthdr* pkthdr, const u_
     PacketData packetData;
     packetData.bytesTotal = pkthdr->len;
     packetData.packetsTotal = 1;
+    packetData.srcPort = 0;
+    packetData.dstPort = 0; //TODO describe in documentation its set to 0 for icmp and icmpv6
 
     // Determine if the packet is IPv4 or IPv6 based on the EtherType field
     uint16_t ethertype = ntohs(*(uint16_t*)(packet + 12)); // EtherType is at bytes 12-13
@@ -258,6 +261,7 @@ void print_all_interfaces(){
         i++;
     }
 
+    devicesDictionary.clear();  // Clear the devices map
     pcap_freealldevs(alldevs);
 }
 
@@ -386,6 +390,11 @@ void parse_arguments(int argc, char **argv) {
 void signal_handler(int signal) {
     pcap_breakloop(opennedDevice);  // Break the pcap_loop() function
     capturing = false;
+    if (opennedDevice) {
+        pcap_close(opennedDevice);
+        opennedDevice = nullptr;
+    }
+    //TODO wait and free resources
 }
 
 int main(int argc, char* argv[]) {
@@ -424,8 +433,17 @@ int main(int argc, char* argv[]) {
     }
 
     //TODO do better cleanup
+    if (opennedDevice) {
     pcap_close(opennedDevice);
+        opennedDevice = nullptr;
+    }
+    devicesDictionary.clear();  // Clear the devices map
+    connectionMap.clear();      // Clear connection map
+    connectionMap.rehash(0);    // Ensure all allocated memory for the map is freed
+    if (alldevs) {
     pcap_freealldevs(alldevs);
+        alldevs = nullptr;
+    }
 
     exit(EXIT_SUCCESS);
 }
