@@ -281,7 +281,7 @@ void print_help() {
 */
 void parse_arguments(int argc, char **argv) {
     int option;
-    while ((option = getopt(argc, argv, "i:s:t:h")) != -1) {
+    while ((option = getopt(argc, argv, "i:s:t:n:h")) != -1) {
         switch (option) {
             case 'i': // Interface
                 config.interfaceName = optarg;
@@ -313,6 +313,25 @@ void parse_arguments(int argc, char **argv) {
                     std::cerr << "Error: Interface number out of range. Set 1 second as default\n";
                     config.refreshTime = 1; // Default value
                 }
+
+                if(config.refreshTime < 1){
+                    std::cerr << "Error: Refresh rate must be at least 1 second. Set 1 second as default\n";
+                    config.refreshTime = 1; // Default value
+                }
+                break;
+
+            case 'n': // Number of connections to show
+                std::size_t pos;
+                config.showRecords = std::stoi(optarg, &pos);
+                if (pos != std::strlen(optarg)) {
+                    std::cerr << "Error: Invalid number of connections to show number. Input contains non-integer characters. Set 10 as default\n";
+                    config.showRecords = 10; // Default value
+                }
+
+                if(config.showRecords < 1){
+                    std::cerr << "Error: Number of connections to show must be at least 1. Set 10 as default\n";
+                    config.showRecords = 10; // Default value
+                }
                 break;
 
             case 'h': // Helper
@@ -340,9 +359,19 @@ void parse_arguments(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+    if (config.sortOption.empty()) {
+        std::cerr << "Warning: Sort option was not provided. Set bytes as default\n";
+        config.sortOption = "bytes"; // Default value
+    }
+
     if (!config.refreshTime.has_value()) {
-        std::cerr << "Error: Refresh rate was not provided. Set 1 second as default\n";
+        std::cerr << "Warning: Refresh rate was not provided. Set 1 second as default\n";
         config.refreshTime = 1; // Default value
+    }
+
+    if (!config.showRecords.has_value()) {
+        std::cerr << "Warning: Number of connections to show was not provided. Set 10 as default\n";
+        config.showRecords = 10; // Default value
     }
 }
 
@@ -374,14 +403,6 @@ int main(int argc, char* argv[]) {
         pcap_freealldevs(alldevs);
         exit(EXIT_FAILURE);
     }
-
-    //TODO remove debug print
-    std::cout << "--------------------------------------" << std::endl;
-    std::cout << "Selected interface: " << device->name << std::endl;
-    std::cout << "Description: " << (device->description ? device->description : "N/A") << std::endl;
-    std::cout << "Sorting by: " << config.sortOption << std::endl;
-    std::cout << "--------------------------------------" << std::endl;
-
 
     // Open the device for packet capture
     opennedDevice = pcap_open_live(device->name, BUFSIZ, 1, 1000, errBuff);
