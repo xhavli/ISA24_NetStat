@@ -7,7 +7,7 @@ Date: 18.11.2024
 
 An application for obtaining network traffic statistics
 
-Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line application to measure internet speed and transmitted payload
+Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line application to measure internet speed and transmitted payloads
 
 ## Program dependencies
 
@@ -19,32 +19,41 @@ Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line
 
 ## Program execution
 
-Application is reading a copy of packets running thru your network interfaces. On some machines, will need to be added permissions to run this app!
+Application is reading a copy of packets running thru your network interfaces. On some machines, will need to be set permissions for run this app under sudo or admin!
 
-Makefile command `make` will compile `isa-top` executable file
+Makefile command `make` will compile isa-top.cpp to a `isa-top` executable file
 
-Example of run command:
+Command example to display all awailable interfaces:
 
 ``` bash
 ./isa-top -i -eno1
 ```
 
+Runn command example with almost every possible arguments:
+
+``` bash
+./isa-top -i -eno1 -s p -t 3 -n 10
+```
+
 ### CLI arguments
 
-| Name              | Argument | Default values | Possible values | Meaning or expected program behaviour
-| ----------------- | -------- | -------------- | --------------- | -------------------------------------
-| Interface         | `-i`     |                | `string`        | Specify network interface where to sniff 
-| Sorting option    | `-s`     | `b`            | `b / p`         | Specify sorting option by bytes or packets
-| Refresh rate      | `-t`     | `1`            | `seconds`       | Set refresh rate of statistics
-| Helper            | `-h`     |                | `h`             | Print help message and exit sucessfully
+| Name              | Argument | Need       | Default values | Possible values | Meaning or expected program behaviour
+| ----------------- | -------- | ---------- |--------------- | --------------- | -------------------------------------
+| Interface         | `-i`     | required   |                | `string`        | Specify network interface where to sniff 
+| Sorting option    | `-s`     | optional   | `b`            | `b / p`         | Specify sorting option by bytes or packets
+| Refresh rate      | `-t`     | optional   | `1`            | `uint_32`       | Set refresh rate of statistics
+| Show connections  | `-n`     | optional   | `10`           | `uint_32`       | Number of connections which will be displayed
+| Helper            | `-h`     | optional   |                | `h`             | Print help message and exit sucessfully
 
-If will be provided argument -i without its value, list of all avalilable interfaces will be shown
+In case some of `optional` arguments will not be provided, "Warning" will be shown and default values will be set
 
 ## Application output
 
-App have two different outputs. One is standard output and second is for error messages
+Here is two different outputs. One is standard output and second is for error messages
 
-Output is in following format using ncurses library where:
+Using ncurses is stdout refreshed by refresh rate
+
+Output meaning:
 - Src IP:port is source addres and its port. Can be IPv4 or IPv6 
 - Dst IP:port is destination addres and its port. Can be IPv4 or IPv6 
 - Proto is transport protocol on which the packet is sent. Can be tcp, udp or icmp
@@ -52,6 +61,28 @@ Output is in following format using ncurses library where:
 - Tx is transmitted data. Values is shown as bytes or packets per second
 
 ![OutputExample](docs/OutputExample.png)
+
+### Good to know
+
+#### ICMP
+
+As icmp is not using ports, it got default **value 0** as non reachable port number
+
+#### Sorting option
+
+Connections is sorted descending by total **Rx+Tx** bytes or packets depends on provided sorting option
+
+#### Bytes and Packets per second
+
+When `-t` argument is set higher than 1, application will show loaded data devided by `-t` value and display unit per second. This number is rounded with precision of 1 decimal. Higher number which can be shown is 999.9. **When owerflow this value, number will be converted** to a higher unit.
+
+Supported units and its suffixes:
+- kilo - k 
+- Mega - M
+- Giga - G
+- Tera - T
+
+Units are calculated with 1000 constant, not 1024 for better reading, not accuracy
 
 ## Implementation detail
 
@@ -68,7 +99,9 @@ Return codes:
 
 ## Testing
 
-Tests were manually compared output of isa-top with Wireshark
+As it is application which sniff real network traffic its hard to test that properly. One opinion is to deploy it on completely isolable machine and send some data.
+
+Tests were provided manually with comparing output of isa-top with Wireshark
 
 ## TODO
 Supported protocols:
@@ -76,6 +109,8 @@ TCP, UDP, ICMP
 
 Supported Interfaces:
 Ethernet - Ethernet header...
+
+Program output
 
 ## Known problems
 - Application not correctly free all used memory at exit
