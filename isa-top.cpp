@@ -55,7 +55,8 @@ struct PacketData {
 };
 std::unordered_map<std::string, PacketData> connectionMap;
 
-
+std::mutex connectionMapMutex;  // Mutex for exclusive access by print_all_connections_info
+std::condition_variable connectionMapConditionVariable; // Condition variable for synchronization
 
 /**
  * @brief Format the load value to the appropriate unit
@@ -69,8 +70,6 @@ std::string format_load(uint32_t load) {
     int i = 0;
 
     // Divide by 1000 to get the appropriate unit, up to Terabytes
-    //TODO mention in documentation - this is a simple way to get the right unit, but it's not the most accurate
-    //TODO mention in documentation - siffix kilo have k for packets also, not as it was shown in example
     while (rate >= 1000 && i < 4) {
         rate /= 1000;
         ++i;
@@ -121,19 +120,19 @@ std::vector<std::pair<std::string, PacketData>> sort_connections(const std::unor
  * @note It clears the screen and prints the connection information
  * @note It sorts the connections based on the sortOption
  */
-void print_all_connections_info() {
+void print_all_connections_statistics() {
     // Initialize ncurses
     initscr();
     noecho();
     cbreak();
     curs_set(0);  // Hide the cursor
-    int row, col;
-    getmaxyx(stdscr, row, col);  // Get screen size
+
+    std::cout << "Loading data..." << std::endl;
 
     while (capturing) {
         std::this_thread::sleep_for(std::chrono::seconds(*config.refreshTime));
 
-        if (!capturing) { break; }  // Exit if capturing is false
+        if (!capturing) { break; }  // Exit if capturing is false after wake up
 
         std::unique_lock<std::mutex> lock(connectionMapMutex);
         printing = true;
@@ -162,11 +161,11 @@ void print_all_connections_info() {
             std::vector<std::pair<std::string, PacketData>> sortedConnections = sort_connections(connectionMap);
             int line = 4;  // Start printing from the 5th row
 
-            for (int i = 0; i < config.showRecords && i < sortedConnections.size(); ++i) {
+            for (int i = 0; i < config.showRecords && i < static_cast<int>(sortedConnections.size()); ++i) {
                 const auto& [key, connectionData] = sortedConnections[i];
-                mvprintw(line, 0, connectionData.srcIP.c_str());
+                mvprintw(line, 0, "%s:%d", connectionData.srcIP.c_str(), connectionData.srcPort);
                 mvprintw(line, 52, "<->");
-                mvprintw(line, 56, connectionData.dstIP.c_str());
+                mvprintw(line, 56, "%s:%d", connectionData.dstIP.c_str(), connectionData.dstPort);
 
                 mvprintw(line, 108, connectionData.protocol.c_str());
 
@@ -247,12 +246,12 @@ void insert_or_update_connection_info(PacketData packetData) {
  * @note It ignores packets with protocols other than TCP, UDP, ICMP, and ICMPv6
  * @note It ignores packets with EtherTypes other than IPv4 and IPv6
  */
-void packet_handler(u_char* userData, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
+void packet_handler([[maybe_unused]] u_char* userData, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
     PacketData packetData;
     packetData.bytesTotal = pkthdr->len;
     packetData.packetsTotal = 1;
     packetData.srcPort = 0;
-    packetData.dstPort = 0; //TODO describe in documentation its set to 0 for icmp and icmpv6
+    packetData.dstPort = 0;
 
     // Determine if the packet is IPv4 or IPv6 based on the EtherType field
     uint16_t ethertype = ntohs(*(uint16_t*)(packet + 12)); // EtherType is at bytes 12-13
@@ -491,7 +490,7 @@ void parse_arguments(int argc, char **argv) {
  * @note It breaks the pcap_loop() function
  * @note It sets the capturing flag to false
  */
-void signal_handler(int signal) {
+void signal_handler([[maybe_unused]] int signal) {
     pcap_breakloop(opennedDevice);  // Break the pcap_loop() function
     capturing = false;
     if (opennedDevice) {
@@ -525,8 +524,8 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Start the thread to periodically print and clear connection info
-    std::thread printerThread(print_all_connections_info);
+    // Start the thread to display a statistics
+    std::thread printerThread(print_all_connections_statistics);
 
     // Capture packets continuously - 0 means infinite packet capture
     pcap_loop(opennedDevice, 0, packet_handler, nullptr);
@@ -538,14 +537,14 @@ int main(int argc, char* argv[]) {
 
     //TODO do better cleanup
     if (opennedDevice) {
-    pcap_close(opennedDevice);
+        pcap_close(opennedDevice);
         opennedDevice = nullptr;
     }
     devicesDictionary.clear();  // Clear the devices map
     connectionMap.clear();      // Clear connection map
     connectionMap.rehash(0);    // Ensure all allocated memory for the map is freed
     if (alldevs) {
-    pcap_freealldevs(alldevs);
+        pcap_freealldevs(alldevs);
         alldevs = nullptr;
     }
 
