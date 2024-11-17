@@ -1,0 +1,65 @@
+.TH isa-top 1 "November 2024" "1.0" "isa-top Manual"
+
+.SH NAME
+isa-top \- An application for obtaining network traffic statistics.
+
+.SH SYNOPSIS
+.B isa-top
+\-i INTERFACE [\-s SORT_OPTION] [\-t REFRESH_RATE] [\-n CONNECTIONS] [\-h]
+
+.SH DESCRIPTION
+isa-top is a command-line tool designed to sniff a specified network interface and display network statistics simmilar as a iftop.
+The output can be customized based on sorting criteria, refresh rate and the number of connections to display.
+Supported protocols are TCP, UDP, ICMP and ICMPv6 based on IPv4 and IPv6. Supported interfaces are ethernet and wifi.
+
+.SH OPTIONS
+.TP
+.B \-i INTERFACE
+(required) Specify the network interface to sniff. 
+Accepts a string value representing the interface name, such as "eth0" or "wlan0".
+
+.TP
+.B \-s SORT_OPTION
+(optional) Specify sorting criteria for the displayed statistics. 
+Defaults to \fB`b`\fP (bytes). Possible values:
+.RS
+.IP b
+Sort by bytes.
+.IP p
+Sort by packets.
+.RE
+
+.TP
+.B \-t REFRESH_RATE
+(optional) Set the refresh rate (in seconds) for updating the statistics. 
+Accepts a 32-bit unsigned integer higher than 0. Default is \fB`1`\fP.
+
+.TP
+.B \-n SHOW_CONNECTIONS
+(optional) Specify the number of connections to display. 
+Accepts a 32-bit unsigned integer higher than 0. Default is \fB`10`\fP.
+
+
+.TP
+.B \-h
+(optional) Display a help message and exit successfully.
+
+.SH EXAMPLES
+.B isa-top \-i eth0 \-s p \-t 2 \-n 10
+Sniff the `eth0` interface, sort by packets, refresh every 2 seconds, and display the top 10 most comunicating connections.
+
+.B isa-top \-i wlan0 \-h
+Display help for the `isa-top` tool.
+
+.B isa-top \-i
+Display all available interfaces.
+
+.SH EXIT STATUS
+.B 0
+Success.
+
+.B 1
+In any error.
+
+.SH SEE ALSO
+tcpdump(8), ifconfig(8), ip(8), iftop(8)
