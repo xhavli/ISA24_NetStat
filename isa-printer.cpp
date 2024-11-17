@@ -81,7 +81,7 @@ void print_all_connections_statistics() {
         if (connectionMap.empty()) {
             mvprintw(1, 0, "No connections captured in the last %d seconds", *config.refreshTime);
         } else {
-            mvprintw(1, 0, "================================================= %lu connections captured in the last %d seconds =================================================", connectionMap.size(), *config.refreshTime);
+            mvprintw(1, 0, "======================================== %lu connections captured in the last %d seconds. Displaying max %d ========================================", connectionMap.size(), *config.refreshTime, *config.showRecords);
             mvprintw(2, 0, "Src IP:port");
             mvprintw(2, 52, "<->");
             mvprintw(2, 56, "Dst IP:port");

@@ -78,7 +78,7 @@ Output meaning:
 - **Tx** is transmitted data. Values is shown as bytes or packets per second
 
 ```bash
-================================================== 6 connections captured in the last 1 seconds ==================================================
+======================================= 6 connections captured in the last 2 seconds. Displaying max 10 ========================================
 Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx
                                                                                                                         b/s    p/s      b/s    p/s
 82.142.127.102:443                                  <-> 147.230.146.57:36340                                tcp         3.0M   46       68.4k  46
@@ -90,6 +90,8 @@ Src IP:port                                         <-> Dst IP:port             
 ```
 
 ### Output details
+
+First line of output show how manny connections was captured in current refresh time
 
 #### ICMP
 
