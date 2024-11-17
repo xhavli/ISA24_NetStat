@@ -1,14 +1,15 @@
 # ISA NetStat
-Author: Adam Havlik - xhavli59
 
-Date: 18.11.2024
+Author: Adam Havlik - xhavli59 
 
-### About the project
+Date: 18.11.2024 
+
+## About
 
 An application for obtaining network traffic statistics
 
 Program is scanning only `tcp`, `udp`, `icmp` or `icmpv6` packets on specified network interface.
-Supported network interfaces are `Ethernet` and `Wlan`. Then statistics will be displayed and updated by refresh time.
+Supported network interfaces are `Ethernet` and `Wlan`. Then statistics will be displayed and updated by refresh time. How many statistics will be displayed depends on provided argument
 
 Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line application to measure internet speed and transmitted payloads
 
@@ -43,8 +44,8 @@ Runn command example with almost every possible arguments:
 ### CLI arguments
 
 | Name              | Argument | Need       | Default values | Possible values | Meaning or expected program behaviour
-| ----------------- | -------- | ---------- |--------------- | --------------- | -------------------------------------
-| Interface         | `-i`     | required   |                | `string`        | Specify network interface where to sniff 
+| ----------------- | -------- | ---------- |--------------- | --------------- | ---------------------------------------------
+| Interface         | `-i`     | required   |                | `string`        | Specify network interface where to sniff
 | Sorting option    | `-s`     | optional   | `b`            | `b / p`         | Specify sorting option by bytes or packets
 | Refresh rate      | `-t`     | optional   | `1`            | `uint_32`       | Set refresh rate of statistics
 | Show connections  | `-n`     | optional   | `10`           | `uint_32`       | Number of connections which will be displayed
@@ -59,8 +60,9 @@ Ncurses library is used to display statistics better and in real time with refre
 Errors, Warnings and other messages is printed to STDERR. Core of application is displayed to terminal using ncurses and will be lost after quit of application
 
 Output meaning:
-- **Src IP:port** is source addres and its port. Can be `IPv4` or `IPv6` 
-- **Dst IP:port** is destination addres and its port. Can be `IPv4` or `IPv6` 
+
+- **Src IP:port** is source addres and its port. Can be `IPv4` or `IPv6`
+- **Dst IP:port** is destination addres and its port. Can be `IPv4` or `IPv6`
 - **Protocol** is transport protocol on which the packet is sent. Can be `tcp`, `udp`, `icmp` or `icmpv6`
 - **Rx** is received data. Values is shown as bytes or packets per second
 - **Tx** is transmitted data. Values is shown as bytes or packets per second
@@ -91,7 +93,8 @@ Connections is sorted descending by total **Rx+Tx** bytes or packets depends on 
 When `-t` argument is set higher than 1, application will show loaded data devided by `-t` value and display unit per second. The result is rounded with precision of 1 decimal. Highest number which can be shown is 999.9. **When owerflow this value, number will be converted** to a higher unit.
 
 Supported units and its suffixes:
-- kilo - k 
+
+- kilo - K
 - Mega - M
 - Giga - G
 - Tera - T
@@ -105,6 +108,7 @@ Theres no object oriented programming (OOP) used in this application. Its writte
 Program will handle `Ctrl+C` interrupt for smooth exit
 
 Return codes:
+
 - 0 if success
 - 1 if any error
 
@@ -129,13 +133,16 @@ As it is application which sniff real network traffic its hard to test that prop
 Tests were provided manually with comparing output of isa-top with Wireshark
 
 ## Known problems
+
 - Application not correctly free all used memory at exit
 - If only `-i` argument will be provided to see available devices, error message will be shown
 - If is set long refresh rate and program recognize `Ctrl+C` interrupt, it will wait for long time to quit
 - If will be pressed `Ctrl+C` more than one time when program is doing escape sequentions, segfault will appear.
   This is typical when user provide long refresh time, want to quit program and think about more interrupts will quit program forcefully and faster.
+- Lot of global variables used in this project
 
 ## Notes
+
 - Developed with suport of ChatGPT and GithubCopilot for better understanding a C++ syntax, not for direct solving core of the project
 - Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` becouse user and root themes are not shared on my local machine.
   Running wireshark as sudo is not recommended due to wide scale of contrubutors and milion lines of code.
