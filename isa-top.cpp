@@ -192,6 +192,7 @@ void find_all_devices(){
 */
 void parse_arguments(int argc, char **argv) {
     int option;
+    std::size_t pos;
     while ((option = getopt(argc, argv, "i:s:t:n:h")) != -1) {
         switch (option) {
             case 'i': // Interface
@@ -210,18 +211,9 @@ void parse_arguments(int argc, char **argv) {
                 break;
 
             case 't': // Refresh time
-                try {
-                    std::size_t pos;
                     config.refreshTime = std::stoi(optarg, &pos);
                     if (pos != std::strlen(optarg)) {
                         std::cerr << "Error: Invalid interface number. Input contains non-integer characters. Set 1 second as default\n";
-                        config.refreshTime = 1; // Default value
-                    }
-                } catch (const std::invalid_argument& e) {
-                    std::cerr << "Error: Invalid interface number (non-integer value). Set 1 second as default\n";
-                    config.refreshTime = 1; // Default value
-                } catch (const std::out_of_range& e) {
-                    std::cerr << "Error: Interface number out of range. Set 1 second as default\n";
                     config.refreshTime = 1; // Default value
                 }
 
@@ -232,7 +224,6 @@ void parse_arguments(int argc, char **argv) {
                 break;
 
             case 'n': // Number of connections to show
-                std::size_t pos;
                 config.showRecords = std::stoi(optarg, &pos);
                 if (pos != std::strlen(optarg)) {
                     std::cerr << "Error: Invalid number of connections to show number. Input contains non-integer characters. Set 10 as default\n";

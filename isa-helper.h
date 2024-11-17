@@ -12,8 +12,8 @@
 struct Config {
     std::string interfaceName;
     std::string sortOption;
-    std::optional<unsigned int> refreshTime;   // in seconds
-    std::optional<unsigned int> showRecords;
+    std::optional<int> refreshTime;   // in seconds
+    std::optional<int> showRecords;
 };
 
 struct PacketData {
