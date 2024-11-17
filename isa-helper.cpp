@@ -12,7 +12,7 @@
  * @note It rounds the rate to 1 decimal place
  */
 std::string format_load(uint32_t load) {
-    const char* suffixes[] = { "", "k", "M", "G", "T" };
+    const char* suffixes[] = { "", "K", "M", "G", "T" };
     double rate = static_cast<double>(load) / config.refreshTime.value();
     int i = 0;
 

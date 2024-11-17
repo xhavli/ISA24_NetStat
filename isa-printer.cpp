@@ -20,12 +20,15 @@ extern bool printing;
  * @note This function is called when -h option is used
  */
 void print_help() {
-    std::cout << "Usage: isa-top -i interface [-s b|p]\n"
+    std::cout << "Usage: isa-top -i <interface> [-s b|p]\n"
               << "Required:\n"
-              << "  -i          Print all available devices\n"
-              << "  -i <int>    Specify the interface name\n"
+              << "  -i              Print all available devices\n"
+              << "  -i <interface>  Specify the interface name\n"
               << "Optional:\n"
-              << "  -s <b|p>    Sort by bytes (b) or packets (p)\n"
+              << "  -s <b|p>        Sort by bytes (b) or packets (p)\n"
+              << "  -t <seconds>    Set refresh rate of statistics in second\n"
+              << "  -n <records>    Set how many connections will be displayed\n"
+              << "Help:\n"
               << "  -h          Show this help message\n";
 }
 
