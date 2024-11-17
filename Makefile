@@ -11,7 +11,7 @@ LDFLAGS = -lpcap -lncurses
 TARGET = isa-top
 
 # Source files defined explicitly, not using wildcard to *.cpp for safety if there are any other .cpp files in the directory
-SRC = isa-top.cpp isa-helper.cpp isa-.cpp
+SRC = isa-top.cpp isa-helper.cpp isa-printer.cpp
 
 # Default rule (this is what gets run when you just type 'make')
 all: $(TARGET)
