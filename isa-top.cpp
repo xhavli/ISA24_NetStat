@@ -1,21 +1,14 @@
+#include "isa-helper.h"
+#include "isa-printer.h"
+
 #include <iostream>
 #include <unistd.h> // for getopt() and sleep()
-#include <string>
 #include <cstring>
-#include <optional> // for optional argument values
 #include <cstdlib>  // for exit()
-#include <stdexcept>    // for exception handling
+#include <stdexcept>// for exception handling
 #include <csignal>  // for signal handling
-#include <algorithm>    // for std::sort
-#include <iomanip>  // for std::setprecision
-#include <sstream>
-#include <vector>
-#include <map>
 #include <thread>
-#include <chrono>      // for std::chrono::seconds
-#include <mutex>
 #include <condition_variable>
-#include <unordered_map>
 #include <netinet/ip.h>     // for IPv4 header
 #include <netinet/ip6.h>    // for IPv6 headers
 #include <netinet/tcp.h>    // for TCP header
@@ -23,171 +16,17 @@
 #include <netinet/ip_icmp.h>// for ICMP header
 #include <arpa/inet.h>      // for inet_ntoa
 #include <pcap.h>   // fedora sudo dnf install libpcap-devel
-#include <ncurses.h>    // fedora sudo dnf install ncurses-devel
 
-struct Config {
-    std::string interfaceName;
-    std::string sortOption;
-    std::optional<unsigned int> refreshTime;   // in seconds
-    std::optional<unsigned int> showRecords;
-};
 Config config;
-
 char errBuff[PCAP_ERRBUF_SIZE];
 pcap_if_t *alldevs = nullptr;
 pcap_t *opennedDevice = nullptr;
 std::map<std::string, pcap_if_t*> devicesDictionary;
 bool capturing = true;
 bool printing = false; 
-
-struct PacketData {
-    std::string srcIP;
-    std::string dstIP;
-    uint16_t srcPort;
-    uint16_t dstPort;
-    std::string protocol;
-    uint32_t bytesRx;
-    uint32_t packetsRx;
-    uint32_t bytesTx;
-    uint32_t packetsTx;
-    uint32_t bytesTotal;
-    uint32_t packetsTotal;
-};
 std::unordered_map<std::string, PacketData> connectionMap;
-
 std::mutex connectionMapMutex;  // Mutex for exclusive access by print_all_connections_info
 std::condition_variable connectionMapConditionVariable; // Condition variable for synchronization
-
-/**
- * @brief Format the load value to the appropriate unit
- * @param[in] load
- * @return formatted load value
- * @note This function is called by print_all_connections_info() to format the load value
- */
-std::string format_load(uint32_t load) {
-    const char* suffixes[] = { "", "k", "M", "G", "T" };
-    double rate = static_cast<double>(load) / config.refreshTime.value();
-    int i = 0;
-
-    // Divide by 1000 to get the appropriate unit, up to Terabytes
-    while (rate >= 1000 && i < 4) {
-        rate /= 1000;
-        ++i;
-    }
-
-    // Round to 1 decimal place
-    std::ostringstream out;
-    // If the value is an integer, print it without the decimal part
-    if (rate == static_cast<int>(rate)) {
-        out << static_cast<int>(rate);
-    } else {
-        out << std::fixed << std::setprecision(1) << rate;  // Print with 1 decimal
-    }
-    out << suffixes[i];
-    return out.str();
-}
-
-/**
- * @brief Sort connections based on the sortOption
- * @param[in] connectionMap
- * @return sorted connections vector
- * @note This function is called by print_all_connections_info() to sort the connections
- */
-std::vector<std::pair<std::string, PacketData>> sort_connections(const std::unordered_map<std::string, PacketData>& connectionMap) 
-{
-    std::vector<std::pair<std::string, PacketData>> connectionsVector(connectionMap.begin(), connectionMap.end());
-
-    if (config.sortOption == "packets") {
-        std::sort(connectionsVector.begin(), connectionsVector.end(),
-            [](const auto& a, const auto& b) {
-                return a.second.packetsTotal > b.second.packetsTotal;
-            });
-    } else {    // Default sorting by bytes
-        std::sort(connectionsVector.begin(), connectionsVector.end(),
-            [](const auto& a, const auto& b) {
-                return a.second.bytesTotal > b.second.bytesTotal;
-            });
-    }
-
-    return connectionsVector;
-}
-
-/**
- * @brief Print all connections information every refreshTime seconds
- * @return void
- * @note This function is locking connectionMapMutex to access the connectionMap
- * @note It uses ncurses to print the information in a table format
- * @note It clears the screen and prints the connection information
- * @note It sorts the connections based on the sortOption
- */
-void print_all_connections_statistics() {
-    // Initialize ncurses
-    initscr();
-    noecho();
-    cbreak();
-    curs_set(0);  // Hide the cursor
-
-    std::cout << "Loading data..." << std::endl;
-
-    while (capturing) {
-        std::this_thread::sleep_for(std::chrono::seconds(*config.refreshTime));
-
-        if (!capturing) { break; }  // Exit if capturing is false after wake up
-
-        std::unique_lock<std::mutex> lock(connectionMapMutex);
-        printing = true;
-
-        clear();  // Clear the ncurses window
-
-        if (connectionMap.empty()) {
-            mvprintw(1, 0, "No connections captured in the last %d seconds", *config.refreshTime);
-        } else {
-            mvprintw(1, 0, "================================================= %lu connections captured in the last %d seconds =================================================", connectionMap.size(), *config.refreshTime);
-            // Print the static header
-            // // Positions   "0   [ipv6]:port max length is 48                    53  56                                                  108         120 124127      136 140143"
-            // mvprintw(2, 0, "Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx");
-            // mvprintw(3, 0, "                                                                                                                        b/s    p/s      b/s    p/s");
-            mvprintw(2, 0, "Src IP:port");
-            mvprintw(2, 52, "<->");
-            mvprintw(2, 56, "Dst IP:port");
-            mvprintw(2, 108, "Protocol");
-            mvprintw(2, 124, "Rx");
-            mvprintw(2, 140, "Tx");
-            mvprintw(3, 120, "b/s");
-            mvprintw(3, 127, "p/s");
-            mvprintw(3, 136, "b/s");
-            mvprintw(3, 143, "p/s");
-
-            std::vector<std::pair<std::string, PacketData>> sortedConnections = sort_connections(connectionMap);
-            int line = 4;  // Start printing from the 5th row
-
-            for (int i = 0; i < config.showRecords && i < static_cast<int>(sortedConnections.size()); ++i) {
-                const auto& [key, connectionData] = sortedConnections[i];
-                mvprintw(line, 0, "%s:%d", connectionData.srcIP.c_str(), connectionData.srcPort);
-                mvprintw(line, 52, "<->");
-                mvprintw(line, 56, "%s:%d", connectionData.dstIP.c_str(), connectionData.dstPort);
-
-                mvprintw(line, 108, connectionData.protocol.c_str());
-
-                mvprintw(line, 120, format_load(connectionData.bytesRx).c_str());
-                mvprintw(line, 127, format_load(connectionData.packetsRx).c_str());
-
-                mvprintw(line, 136, format_load(connectionData.bytesTx).c_str());
-                mvprintw(line, 143, format_load(connectionData.packetsTx).c_str());
-
-                line++;
-            }
-            connectionMap.clear();  // Clear after printing
-        }
-
-        refresh();  // Refresh the screen to display changes
-        printing = false;
-        connectionMapConditionVariable.notify_all();
-    }
-
-    // End ncurses
-    endwin();
-}
 
 /**
  * @brief Insert or update connection information
@@ -347,41 +186,6 @@ void find_all_devices(){
 }
 
 /**
- * @brief Print vector of all available interfaces with its description
- */
-void print_all_interfaces(){
-    find_all_devices();
-    process_all_devices();
-
-    std::cout << "Available interfaces:" << std::endl;
-    int i = 0;
-    for (const auto& [name, device] : devicesDictionary) {
-        std::cout << i + 1 << ". " << device->name;
-        if (device->description) {
-            std::cout << " (" + std::string(device->description) + ")";
-        }
-        std::cout << std::endl;
-        i++;
-    }
-
-    devicesDictionary.clear();  // Clear the devices map
-    pcap_freealldevs(alldevs);
-}
-
-/**
- * @brief Print help message
- */
-void print_help() {
-    std::cout << "Usage: isa-top -i interface [-s b|p]\n"
-              << "Required:\n"
-              << "  -i          Print all available devices\n"
-              << "  -i <int>    Specify the interface name\n"
-              << "Optional:\n"
-              << "  -s <b|p>    Sort by bytes (b) or packets (p)\n"
-              << "  -h          Show this help message\n";
-}
-
-/**
 * @brief Parse and validate arguments from command line
 * @param[in] argc arguments count
 * @param[in] argv arguments array
@@ -447,7 +251,11 @@ void parse_arguments(int argc, char **argv) {
 
             case '?': // Unknown or missing argument
                 if (optopt == 'i') {
-                    print_all_interfaces();
+                    find_all_devices();
+                    process_all_devices();
+                    print_all_interfaces(&devicesDictionary);
+                    devicesDictionary.clear();
+                    pcap_freealldevs(alldevs);
                     exit(EXIT_SUCCESS);
                 }
                 std::cerr << "Error: Unknown option or missing argument\n";
@@ -497,7 +305,6 @@ void signal_handler([[maybe_unused]] int signal) {
         pcap_close(opennedDevice);
         opennedDevice = nullptr;
     }
-    //TODO wait and free resources
 }
 
 int main(int argc, char* argv[]) {
@@ -535,7 +342,6 @@ int main(int argc, char* argv[]) {
         printerThread.join();   // Wait for the printer thread to finish
     }
 
-    //TODO do better cleanup
     if (opennedDevice) {
         pcap_close(opennedDevice);
         opennedDevice = nullptr;
