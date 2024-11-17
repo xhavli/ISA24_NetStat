@@ -35,7 +35,7 @@ Makefile command `make` will compile isa-top.cpp to a `isa-top` executable file
 ./isa-top -i eno1
 ```
 
-- Runn command example with almost every possible arguments
+- Run command example with almost every possible arguments
 
 ``` bash
 ./isa-top -i eno1 -s p -t 2 -n 10
@@ -57,11 +57,11 @@ In case some of `optional` arguments will not be provided, "Warning" will be sho
 
 ### Man page
 
+Example to run manual page locally
+
 ```bash
 man ./isa-top.1
 ```
-
-To display manual page locally
 
 ## Application output
 
@@ -78,6 +78,7 @@ Output meaning:
 - **Tx** is transmitted data. Values is shown as bytes or packets per second
 
 ```bash
+================================================== 6 connections captured in the last 1 seconds ==================================================
 Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx
                                                                                                                         b/s    p/s      b/s    p/s
 82.142.127.102:443                                  <-> 147.230.146.57:36340                                tcp         3.0M   46       68.4k  46
