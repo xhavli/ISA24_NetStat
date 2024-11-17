@@ -4,7 +4,7 @@
 #include <chrono>   // for std::chrono for sleep_for
 #include <thread>   // for std::this_thread::sleep_for
 #include <iostream> // for std::cout
-#include <ncurses.h>// to display the statistics better
+#include <ncurses.h>// fedora sudo dnf install ncurses-devel
 #include <condition_variable>   // for std::condition_variable
 
 extern Config config; // Access global config
