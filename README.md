@@ -29,17 +29,19 @@ As application is reading a copy of packets running thru your network interfaces
 
 Makefile command `make` will compile isa-top.cpp to a `isa-top` executable file
 
-Command example to display all awailable interfaces:
+- Command example to display all awailable interfaces
 
 ``` bash
 ./isa-top -i eno1
 ```
 
-Runn command example with almost every possible arguments:
+- Runn command example with almost every possible arguments
 
 ``` bash
 ./isa-top -i eno1 -s p -t 2 -n 10
 ```
+
+Sniff the eth0 interface, sort by packets, refresh every 2 seconds, and display the top 10 most comunicating connections
 
 ### CLI arguments
 
@@ -52,6 +54,14 @@ Runn command example with almost every possible arguments:
 | Helper            | `-h`     | optional   |                | `h`             | Print help message and exit sucessfully
 
 In case some of `optional` arguments will not be provided, "Warning" will be shown and default values will be set
+
+### Man page
+
+```bash
+man ./isa-top.1
+```
+
+To display manual page locally
 
 ## Application output
 
@@ -128,9 +138,25 @@ isa-top.cpp <- isa-printer.cpp <- isa-helper.cpp
 
 ## Testing
 
-As it is application which sniff real network traffic its hard to test that properly. One opinion is to deploy it on completely isolable machine and send some data.
+As it is application which read real network traffic its hard to test that properly. One opinion is to deploy it on completely isolable machine and send some data. But i dont have time for this.
 
-Tests were provided manually with comparing output of isa-top with Wireshark
+Tests were provided manually with comparing output of isa-top with Wireshark and iftop
+
+### WireShark test
+
+This test show if reading data is valid due to WireShark application
+
+As we can see Rx or Tx load and packets are equal
+
+![WireSharkTest](docs/WireSharkTest.png)
+
+### iftop test
+
+This test show if output is simmilar due to iftop application
+
+We can see some common interfaces based on IPv4 at top of both applications
+
+![IftopTest](docs/IftopTest.png)
 
 ## Known problems
 
