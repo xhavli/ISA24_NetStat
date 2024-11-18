@@ -1,8 +1,8 @@
 # ISA NetStat
 
-Author: Adam Havlik - xhavli59 
+Author: Adam Havlik - xhavli59
 
-Date: 18.11.2024 
+Date: 18.11.2024
 
 ## About
 

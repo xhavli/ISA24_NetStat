@@ -1,3 +1,9 @@
+/**
+ * Project: ISA - isa-top
+ * Author: Adam Havlik (xhavli59)
+ * Date: 18.11.2024
+ */
+
 #include "isa-helper.h"
 #include "isa-printer.h"
 
@@ -23,7 +29,7 @@ pcap_if_t *alldevs = nullptr;
 pcap_t *opennedDevice = nullptr;
 std::map<std::string, pcap_if_t*> devicesDictionary;
 bool capturing = true;
-bool printing = false; 
+bool printing = false;
 std::unordered_map<std::string, PacketData> connectionMap;
 std::mutex connectionMapMutex;  // Mutex for exclusive access by print_all_connections_info
 std::condition_variable connectionMapConditionVariable; // Condition variable for synchronization
@@ -211,9 +217,9 @@ void parse_arguments(int argc, char **argv) {
                 break;
 
             case 't': // Refresh time
-                    config.refreshTime = std::stoi(optarg, &pos);
-                    if (pos != std::strlen(optarg)) {
-                        std::cerr << "Error: Invalid interface number. Input contains non-integer characters. Set 1 second as default\n";
+                config.refreshTime = std::stoi(optarg, &pos);
+                if (pos != std::strlen(optarg)) {
+                    std::cerr << "Error: Invalid interface number. Input contains non-integer characters. Set 1 second as default\n";
                     config.refreshTime = 1; // Default value
                 }
 
