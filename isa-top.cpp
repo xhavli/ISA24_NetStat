@@ -282,6 +282,26 @@ void parse_arguments(int argc, char **argv) {
 }
 
 /**
+ * @brief Close all devices and free all allocated memory
+ * @return void
+ */
+void cleanup(){
+    if (opennedDevice) {
+        pcap_close(opennedDevice);
+        opennedDevice = nullptr;
+    }
+
+    devicesDictionary.clear();  // Clear the devices map
+    connectionMap.clear();      // Clear connection map
+    connectionMap.rehash(0);    // Ensure all allocated memory for the map is freed
+    
+    if (alldevs) {
+        pcap_freealldevs(alldevs);
+        alldevs = nullptr;
+    }
+}
+
+/**
  * @brief Handle signal
  * @param[in] signal
  * @return void
@@ -292,10 +312,6 @@ void parse_arguments(int argc, char **argv) {
 void signal_handler([[maybe_unused]] int signal) {
     pcap_breakloop(opennedDevice);  // Break the pcap_loop() function
     capturing = false;
-    if (opennedDevice) {
-        pcap_close(opennedDevice);
-        opennedDevice = nullptr;
-    }
 }
 
 int main(int argc, char* argv[]) {
@@ -330,20 +346,11 @@ int main(int argc, char* argv[]) {
 
     // Ensure that printerThread exits properly after capturing is stopped
     if (printerThread.joinable()) {
+        capturing = false;
         printerThread.join();   // Wait for the printer thread to finish
     }
 
-    if (opennedDevice) {
-        pcap_close(opennedDevice);
-        opennedDevice = nullptr;
-    }
-    devicesDictionary.clear();  // Clear the devices map
-    connectionMap.clear();      // Clear connection map
-    connectionMap.rehash(0);    // Ensure all allocated memory for the map is freed
-    if (alldevs) {
-        pcap_freealldevs(alldevs);
-        alldevs = nullptr;
-    }
+    cleanup();
 
     exit(EXIT_SUCCESS);
 }
