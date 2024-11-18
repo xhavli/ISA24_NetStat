@@ -8,14 +8,32 @@ Date: 18.11.2024
 
 An application for obtaining network traffic statistics
 
-Program is scanning only `tcp`, `udp`, `icmp` or `icmpv6` packets on specified network interface.
-Supported network interfaces are `Ethernet` and `Wlan`. Then statistics will be displayed and updated by refresh time. How many statistics will be displayed depends on provided argument
+The program scans only `tcp`, `udp`, `icmp` or `icmpv6` packets on a specified network interface.
+Supported network interfaces are `Ethernet` and `Wlan`. The statistics are displayed and updated based on the refresh interval.
 
 Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line application to measure internet speed and transmitted payloads
 
-GitHub repository [link](https://github.com/xhavli/ISA24_NetStat) to my solution
+GitHub repository [link](https://github.com/xhavli/ISA24_NetStat) to solution
 
-## Program dependencies
+## Problem Introduction
+
+### IPv4
+
+#### TCP (IPv4)
+
+#### UDP (IPv4)
+
+#### ICMP (IPv4)
+
+### IPv6
+
+#### TCP (IPv6)
+
+#### UDP (IPv6)
+
+#### ICMPv6 (IPv6)
+
+## Program Dependencies
 
 - Language C++
 - Compiler g++
@@ -23,39 +41,11 @@ GitHub repository [link](https://github.com/xhavli/ISA24_NetStat) to my solution
 - Library ncurses
 - License GPL-3.0
 
-## Program execution
+## Program Execution
 
 As application is reading a copy of packets running thru your network interfaces. On some machines, will need to be set permissions for run this app under sudo or admin!
 
-Makefile command `make` will compile isa-top.cpp to a `isa-top` executable file
-
-- Command example to display all awailable interfaces
-
-``` bash
-./isa-top -i eno1
-```
-
-- Run command example with almost every possible arguments
-
-``` bash
-./isa-top -i eno1 -s p -t 2 -n 10
-```
-
-Sniff the eth0 interface, sort by packets, refresh every 2 seconds, and display the top 10 most comunicating connections
-
-### CLI arguments
-
-| Name              | Argument | Need       | Default values | Possible values | Meaning or expected program behaviour
-| ----------------- | -------- | ---------- |--------------- | --------------- | ---------------------------------------------
-| Interface         | `-i`     | required   |                | `string`        | Specify network interface where to sniff
-| Sorting option    | `-s`     | optional   | `b`            | `b / p`         | Specify sorting option by bytes or packets
-| Refresh rate      | `-t`     | optional   | `1`            | `uint_32`       | Set refresh rate of statistics
-| Show connections  | `-n`     | optional   | `10`           | `uint_32`       | Number of connections which will be displayed
-| Helper            | `-h`     | optional   |                | `h`             | Print help message and exit sucessfully
-
-In case some of `optional` arguments will not be provided, "Warning" will be shown and default values will be set
-
-### Man page
+### Manual Page
 
 Example to run manual page locally
 
@@ -63,11 +53,47 @@ Example to run manual page locally
 man ./isa-top.1
 ```
 
-## Application output
+### Makefile
 
-Ncurses library is used to display statistics better and in real time with refresh rate provided by user
+Makefile commands:
 
-Errors, Warnings and other messages is printed to STDERR. Core of application is displayed to terminal using ncurses and will be lost after quit of application
+- `make` will compile program to a `isa-top` executable file
+- `make clean` will remove `isa-top` executable file
+
+### Run Commands
+
+Display all awailable interfaces
+
+``` bash
+./isa-top -i
+```
+
+Provide almost every possible arguments
+
+- Sniff the eno1 interface, sort by packets, refresh every 2 seconds, and display the top 10 most active connections
+
+``` bash
+./isa-top -i eno1 -s p -t 2 -n 10
+```
+
+#### CLI arguments
+
+| Name              | Argument | Need       | Default values | Possible values | Meaning or expected program behaviour
+| ----------------- | -------- | ---------- |--------------- | --------------- | ---------------------------------------------
+| Interface         | `-i`     | required   |                | `string`        | Specify network interface where to sniff
+| Sorting option    | `-s`     | optional   | `b`            | `b / p`         | Specify sorting option by bytes or packets
+| Refresh rate      | `-t`     | optional   | `1`            | `uint_32`       | Set refresh rate of statistics
+| Show records      | `-n`     | optional   | `10`           | `uint_32`       | Maximum of records which will be displayed
+| Helper            | `-h`     | optional   |                | `h`             | Print help message and exit sucessfully
+
+- In case some of `optional` arguments will not be provided, "Warning" will be shown and default values will be set
+- In case some of `optional` arguments will be provided with wrong values, "Error" will be shown and default values will be set
+
+## Application Output
+
+The ncurses library is used to display statistics in real time, based on the user-defined refresh rate
+
+Errors, warnings, and other messages are printed to STDERR. Core of application is displayed to terminal using ncurses and will be lost after quit of application
 
 Output meaning:
 
@@ -77,7 +103,7 @@ Output meaning:
 - **Rx** is received data. Values is shown as bytes or packets per second
 - **Tx** is transmitted data. Values is shown as bytes or packets per second
 
-```bash
+```plaintext
 ======================================= 6 connections captured in the last 2 seconds. Displaying max 10 ========================================
 Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx
                                                                                                                         b/s    p/s      b/s    p/s
@@ -89,9 +115,9 @@ Src IP:port                                         <-> Dst IP:port             
 [fe80::cd51:4265:e3ea:8725]:0                       <-> [ff02::1:ff4f:599e]:0                               icmpv6      0      0        86     1
 ```
 
-### Output details
+### Output Details
 
-First line of output show how manny connections was captured in current refresh time
+First line of output show how many connections was captured in current refresh time and how many is displaying
 
 #### ICMP
 
@@ -99,45 +125,50 @@ As icmp is not using ports, it got default **value 0** as non reachable port num
 
 #### Rx and Tx traffic
 
-Connections is sorted descending by total **Rx+Tx** bytes or packets depends on provided sorting option
+Connections are sorted descending by total **Rx+Tx** bytes or packets, depending on the sorting option
 
 #### Bytes and Packets loads
 
-When `-t` argument is set higher than 1, application will show loaded data devided by `-t` value and display unit per second. The result is rounded with precision of 1 decimal. Highest number which can be shown is 999.9. **When owerflow this value, number will be converted** to a higher unit.
+If the `-t` argument is greater than 1, the application calculates data per second by dividing the total by `-t`. Values are rounded to 1 decimal place. Numbers exceeding 999.9 are converted to higher units.
 
 Supported units and its suffixes:
 
-- kilo - K
+- Kilo - K
 - Mega - M
 - Giga - G
 - Tera - T
 
-Units are calculated with 1000 constant, not 1024 for better reading, not accuracy
+Units are calculated with a constant of 1000, not 1024, for simplicity and readability
 
-## Implementation detail
+## Implementation Detail
 
-Theres no object oriented programming (OOP) used in this application. Its written like plain C style
+The application avoids object-oriented programming (OOP) and uses a plain C-style approach.
 
 Program will handle `Ctrl+C` interrupt for smooth exit
 
-Return codes:
-
-- 0 if success
-- 1 if any error
-
 ### Architecture
 
-isa-top.cpp <- isa-printer.cpp <- isa-helper.cpp
+```plaintext
+isa-top.cpp -+- isa-printer.cpp --- isa-helper.cpp
+             |
+             +- isa-helper.cpp
+```
 
-### Program flow
+### Program Flow
 
 - Arguments parsing
-- Searching for available interfaces
+- Search for available interfaces
 - Select interface
 - Open interface to read traffic
 - Start printer thread
-- Reading data from interface in infinite loop
+- Read data from interface in infinite loop
+- Display statistics continously
 - Exit on Ctrl+C
+
+### Return Codes
+
+- 0 if success
+- 1 if any error
 
 ## Testing
 
@@ -145,7 +176,7 @@ As it is application which read real network traffic its hard to test that prope
 
 Tests were provided manually with comparing output of isa-top with Wireshark and iftop
 
-### WireShark test
+### WireShark Test
 
 This test show if reading data is valid due to WireShark application
 
@@ -153,7 +184,7 @@ As we can see Rx or Tx load and packets are equal
 
 ![WireSharkTest](docs/WireSharkTest.png)
 
-### iftop test
+### iftop Test
 
 This test show if output is simmilar due to iftop application
 
@@ -161,7 +192,7 @@ We can see some common interfaces based on IPv4 at top of both applications
 
 ![IftopTest](docs/IftopTest.png)
 
-## Known problems
+## Known Problems
 
 - Application not correctly free all used memory at exit
 - If only `-i` argument will be provided to see available devices, error message will be shown
@@ -174,4 +205,4 @@ We can see some common interfaces based on IPv4 at top of both applications
 
 - Developed with suport of ChatGPT and GithubCopilot for better understanding a C++ syntax, not for direct solving core of the project
 - Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` becouse user and root themes are not shared on my local machine.
-  Running wireshark as sudo is not recommended due to wide scale of contrubutors and milion lines of code.
+  Running Wireshark as root is not recommended due to its extensive codebase and contributors
