@@ -20,7 +20,7 @@ extern bool printing;
  * @note This function is called when -h option is used
  */
 void print_help() {
-    std::cout << "Usage: isa-top -i <interface> [-s b|p]\n"
+    std::cout << "Usage: isa-top -i <interface> [-s b|p] [-t seconds] [-n records]\n"
               << "Required:\n"
               << "  -i              Print all available devices\n"
               << "  -i <interface>  Specify the interface name\n"
@@ -63,8 +63,8 @@ void print_all_connections_statistics() {
     // Initialize ncurses
     initscr();
     noecho();
-    cbreak();
-    curs_set(0);  // Hide the cursor
+    cbreak();   // Disable line buffering
+    curs_set(0);    // Hide the cursor
 
     std::cout << "Loading data..." << std::endl;
 
