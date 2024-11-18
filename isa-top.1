@@ -5,7 +5,7 @@ isa-top \- An application for obtaining network traffic statistics.
 
 .SH SYNOPSIS
 .B isa-top
-\-i INTERFACE [\-s SORT_OPTION] [\-t REFRESH_RATE] [\-n CONNECTIONS] [\-h]
+\-i INTERFACE [\-s SORT_OPTION] [\-t REFRESH_RATE] [\-n RECORDS] [\-h]
 
 .SH DESCRIPTION
 isa-top is a command-line tool designed to sniff a specified network interface and display network statistics simmilar as a iftop.
@@ -35,8 +35,8 @@ Sort by packets.
 Accepts a 32-bit unsigned integer higher than 0. Default is \fB`1`\fP.
 
 .TP
-.B \-n SHOW_CONNECTIONS
-(optional) Specify the number of connections to display. 
+.B \-n SHOW_RECORDS
+(optional) Specify the number of records to display. 
 Accepts a 32-bit unsigned integer higher than 0. Default is \fB`10`\fP.
 
 
