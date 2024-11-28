@@ -108,6 +108,7 @@ Compressed Format: `2001:db8::1` (removing leading zeros and consecutive zeros).
 - Library libpcap
 - Library ncurses
 - License GPL-3.0
+- Developed for linux
 
 ## Program Execution
 
@@ -172,15 +173,16 @@ Output meaning:
 - **Tx** is transmitted data. Values is shown as bytes or packets per second
 
 ```plaintext
-======================================= 6 connections captured in the last 2 seconds. Displaying max 10 ========================================
-Src IP:port                                         <-> Dst IP:port                                         Protocol        Rx              Tx
-                                                                                                                        b/s    p/s      b/s    p/s
-82.142.127.102:443                                  <-> 147.230.146.57:36340                                tcp         3.0M   46       68.4k  46
-147.230.146.57:55943                                <-> 104.21.234.52:443                                   udp         2.1K   6        1.4k   7
-[fe80::8e4b:65d4:446a:78f4]:60896                   <-> [ff02::c]:3702                                      udp         0      0        2.2k   3
-147.230.146.34:64492                                <-> 147.230.187.255:1947                                udp         0      0        1.4k   17
-140.82.114.26:443                                   <-> 147.230.146.57:43626                                tcp         96     1        158    2
-[fe80::cd51:4265:e3ea:8725]:0                       <-> [ff02::1:ff4f:599e]:0                               icmpv6      0      0        86     1
+
+========================= 6 connections captured in the last 2 seconds. Displaying max 10 ========================
+Src IP:port                             <-> Dst IP:port                 Protocol            Rx              Tx
+                                                                                        b/s    p/s      b/s    p/s
+82.142.127.102:443                      <-> 147.230.146.57:36340        tcp             3.0M   46       68.4K  46
+147.230.146.57:55943                    <-> 104.21.234.52:443           udp             2.1K   6        1.4K   7
+[fe80::8e4b:65d4:446a:78f4]:60896       <-> [ff02::c]:3702              udp             0      0        2.2K   3
+147.230.146.34:64492                    <-> 147.230.187.255:1947        udp             0      0        1.4K   17
+140.82.114.26:443                       <-> 147.230.146.57:43626        tcp             96     1        158    2
+[fe80::cd51:4265:e3ea:8725]:0           <-> [ff02::1:ff4f:599e]:0       icmpv6          0      0        86     1
 ```
 
 ### Output Details
@@ -189,11 +191,11 @@ First line of output show how many connections was captured in current refresh t
 
 #### ICMP a ICMPv6
 
-As icmp is not using ports, it got default **value 0** as non reachable port number
+As icmp is not using ports, it got **default value 0** as non reachable port number
 
 #### Rx and Tx traffic
 
-Connections are sorted descending by total **Rx+Tx** bytes or packets, depending on the sorting option
+Connections are sorted descending by total **Rx + Tx** bytes or packets, depending on the sorting option
 
 #### Bytes and Packets loads
 
@@ -201,10 +203,10 @@ If the `-t` argument is greater than 1, the application calculates data per seco
 
 Supported units and its suffixes:
 
-- Kilo - K
-- Mega - M
-- Giga - G
-- Tera - T
+- K - Kilo
+- M - Mega
+- G - Giga
+- T - Tera
 
 Units are calculated with a constant of 1000, not 1024, for simplicity and readability
 
@@ -224,6 +226,7 @@ isa-top.cpp -+- isa-printer.cpp -+- isa-helper.cpp
              +- isa-helper.cpp   +  ncurses.h 
              .  isa-helper.h
              .
+             .
              +  pcap.h
 ```
 
@@ -240,18 +243,20 @@ isa-top.cpp -+- isa-printer.cpp -+- isa-helper.cpp
 
 ### Return Codes
 
-- 0 if success
-- 1 if any error
+- 0 on success
+- 1 on any error
 
 ### Storing Connections
 
-Connections are stored in hash map with compound key which strongly depends on first packet which application capture from the traffic. What is SrcIp, SrcPort, DstIP, DstPort and protocol
+Connections are stored in hash map with compound key which strongly depends on first packet which application capture from the traffic. What is SrcIp, SrcPort, DstIP, DstPort and Protocol
 
 ```c
 void insert_or_update_connection_info(PacketData packetData) {
-    // Define both key variations for the connection (source-to-destination and destination-to-source)
-    std::string defaultConnectionKey = packetData.srcIP + packetData.srcPort + packetData.dstIP + packetData.dstPort + packetData.protocol;
-    std::string reverseConnectionKey = packetData.dstIP + packetData.dstPort + packetData.srcIP + packetData.srcPort + packetData.protocol;
+    // Define both key variations for the connection (source-destination and destination-source)
+    std::string defaultConnectionKey = packetData.srcIP + packetData.srcPort +
+                                       packetData.dstIP + packetData.dstPort + packetData.protocol;
+    std::string reverseConnectionKey = packetData.dstIP + packetData.dstPort + 
+                                       packetData.srcIP + packetData.srcPort + packetData.protocol;
     
     // Check if the connection exists by the default key
     if (connectionsMap.find(defaultConnectionKey) != connectionsMap.end()) {
@@ -274,9 +279,9 @@ As it is application which read real network traffic its hard to test that prope
 
 Tests were provided manually with comparing output of isa-top with Wireshark and iftop
 
-### WireShark Test
+### Wireshark Test
 
-This test show if reading data is valid due to WireShark application
+This test show if reading data is valid due to Wireshark application
 
 As we can see Rx or Tx load and packets are equal
 
@@ -323,6 +328,22 @@ The **Tx** value from `iftop` is **138 kilobits**, which equals 17.25 kilobytes.
 
 ## Notes
 
+### Install used libraries
+
+pcap.h install to Fedora
+
+```plaintext
+sudo dnf install libpcap-devel
+```
+
+ncurses.h install to Fedora
+
+```plaintext
+sudo dnf install ncurses-devel
+```
+
+### Other
+
 - Developed with suport of ChatGPT and GithubCopilot for better understanding a C++ syntax, not for direct solving core of the project
-- Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` becouse user and root themes are not shared on my local machine.
+- Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` becouse user and root themes are not shared on sample machine.
   Running Wireshark as root is not recommended due to its extensive codebase and contributors
