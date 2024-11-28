@@ -15,11 +15,38 @@ Inspired by [iftop](https://pdw.ex-parrot.com/iftop/), native linux command line
 
 GitHub repository [link](https://github.com/xhavli/ISA24_NetStat) to solution
 
+## Summary
+
+- [About](#about)
+- [Summary](#summary)
+- [Problem Introduction](#problem-introduction)
+- [Program Dependencies](#program-dependencies)
+- [Program Execution](#program-execution)
+  - [Manual Page](#manual-page)
+  - [Makefile](#makefile)
+  - [Run Commands](#run-commands)
+    - [CLI arguments](#cli-arguments)
+- [Application Output](#application-output)
+  - [Output Details](#output-details)
+    - [ICMP and ICMPv6](#icmp-and-icmpv6)
+    - [Rx and Tx traffic](#rx-and-tx-traffic)
+    - [Bytes and Packets loads](#bytes-and-packets-loads)
+- [Implementation Detail](#implementation-detail)
+  - [Architecture](#architecture)
+  - [Program Flow](#program-flow)
+  - [Return Codes](#return-codes)
+- [Testing](#testing)
+  - [Wireshark Test](#wireshark-test)
+  - [Iftop Test](#iftop-test)
+- [Known Problems](#known-problems)
+- [Bibliography](#bibliography)
+- [Notes](#notes)
+
 ## Problem Introduction
 
 ### TCP/IP Stack
 
-Heres is a pictures displaying whats heppenning in TCP/IP model, its layers and some of all protocols on each layer or sample build packet
+Heres is a pictures displaying whats happening in TCP/IP model, its layers and some of all protocols on each layer or sample build packet
 
 ![TCP/IP_STACK](docs/TCPIPStack.png)
 
@@ -131,7 +158,7 @@ Makefile commands:
 
 ### Run Commands
 
-Display all awailable interfaces
+Display all available interfaces
 
 ``` bash
 ./isa-top -i
@@ -189,7 +216,7 @@ Src IP:port                             <-> Dst IP:port                 Protocol
 
 First line of output show how many connections was captured in current refresh time and how many is displaying
 
-#### ICMP a ICMPv6
+#### ICMP and ICMPv6
 
 As icmp is not using ports, it got **default value 0** as non reachable port number
 
@@ -238,7 +265,7 @@ isa-top.cpp -+- isa-printer.cpp -+- isa-helper.cpp
 - Open interface to read traffic
 - Start printer thread
 - Read data from interface in infinite loop
-- Display statistics continously
+- Display statistics continuously
 - Exit on Ctrl+C
 
 ### Return Codes
@@ -275,7 +302,7 @@ void insert_or_update_connection_info(PacketData packetData) {
 
 ## Testing
 
-As it is application which read real network traffic its hard to test that properly. One opinion is to deploy it on completely isolable machine and send some data. But i dont have time for this.
+As it is application which read real network traffic its hard to test that properly. One opinion is to deploy it on completely isolable machine and send some data. But i don't have time for this.
 
 Tests were provided manually with comparing output of isa-top with Wireshark and iftop
 
@@ -287,7 +314,7 @@ As we can see Rx or Tx load and packets are equal
 
 ![WireSharkTest](docs/WireSharkTest.png)
 
-### iftop Test
+### Iftop Test
 
 This test shows if the output is similar due to the use of the iftop application.
 
@@ -305,7 +332,7 @@ The **Tx** value from `iftop` is **138 kilobits**, which equals 17.25 kilobytes.
 - Lot of global variables used in this project
 - If only `-i` argument will be provided to see available devices, error message will be shown
 - If is set long refresh rate and program recognize `Ctrl+C` interrupt, it will wait for long time to quit
-- If will be pressed `Ctrl+C` more than one time when program is doing escape sequentions, segfault will appear.
+- If will be pressed `Ctrl+C` more than one time when program is doing escape sequencies, segfault will appear.
   This is typical when user provide long refresh time, want to quit program and think about more interrupts will quit program forcefully and faster.
 
 ## Bibliography
@@ -344,6 +371,6 @@ sudo dnf install ncurses-devel
 
 ### Other
 
-- Developed with suport of ChatGPT and GithubCopilot for better understanding a C++ syntax, not for direct solving core of the project
-- Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` becouse user and root themes are not shared on sample machine.
+- Developed with support of ChatGPT and GithubCopilot for better understanding a C++ syntax, not for direct solving core of the project
+- Run Wireshark in dark mode as `sudo wireshark -style Adwaita-Dark` because user and root themes are not shared on sample machine.
   Running Wireshark as root is not recommended due to its extensive codebase and contributors
